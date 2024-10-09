@@ -1,12 +1,12 @@
 r"""
 Installation requirements:
-    pip install trame trame-vuetify trame-plotly
+    pip install trame trame-vuetify trame-plotly trame-components sklearn umap-learn
 """
 
 import plotly.graph_objects as go
 
 from trame.app import get_server
-from trame.ui.vuetify3 import SinglePageLayout, SinglePageWithDrawerLayout
+from trame.ui.vuetify3 import SinglePageWithDrawerLayout
 from trame.widgets import vuetify3, plotly, html
 import numpy as np
 import umap
