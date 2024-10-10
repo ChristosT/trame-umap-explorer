@@ -343,49 +343,48 @@ with SinglePageWithDrawerLayout(server) as layout:
                     hide_details=True,
                     thumb_label=True,
                 )
-
-        vuetify3.VSelect(
-            v_model=("color_by", None),
-            items=(
-                "channel",
-                [
-                    {"title": "None", "value": None},
-                    {"title": "0", "value": 0},
-                    {"title": "1", "value": 1},
-                    {"title": "2", "value": 2},
-                    {"title": "3", "value": 3},
-                    {"title": "10", "value": 10},
-                    {"title": "20", "value": 20},
-                    {"title": "30", "value": 30},
-                    {"title": "12", "value": 12},
-                    {"title": "13", "value": 13},
-                    {"title": "23", "value": 23},
-                ],
-            ),
-        )
-        vuetify3.VSlider(
-            label="marker size",
-            v_model=(
-                "marker_size",
-                DEFAULTS["marker_size"],
-            ),
-            min=0.1,
-            max=3,
-            step=0.01,
-            hide_details=True,
-            thumb_label=True,
-        )
-        vuetify3.VSelect(
-            label="dimension",
-            v_model=("dimension", 2),
-            items=(
-                "dimensions",
-                [
-                    {"title": "2", "value": 2},
-                    {"title": "3", "value": 3},
-                ],
-            ),
-        )
+                vuetify3.VSelect(
+                    v_model=("color_by", None),
+                    items=(
+                        "channel",
+                        [
+                            {"title": "None", "value": None},
+                            {"title": "0", "value": 0},
+                            {"title": "1", "value": 1},
+                            {"title": "2", "value": 2},
+                            {"title": "3", "value": 3},
+                            {"title": "10", "value": 10},
+                            {"title": "20", "value": 20},
+                            {"title": "30", "value": 30},
+                            {"title": "12", "value": 12},
+                            {"title": "13", "value": 13},
+                            {"title": "23", "value": 23},
+                        ],
+                    ),
+                )
+                vuetify3.VSlider(
+                    label="marker size",
+                    v_model=(
+                        "marker_size",
+                        DEFAULTS["marker_size"],
+                    ),
+                    min=0.1,
+                    max=3,
+                    step=0.01,
+                    hide_details=True,
+                    thumb_label=True,
+                )
+                vuetify3.VSelect(
+                    label="dimension",
+                    v_model=("dimension", 2),
+                    items=(
+                        "dimensions",
+                        [
+                            {"title": "2", "value": 2},
+                            {"title": "3", "value": 3},
+                        ],
+                    ),
+                )
 
         vuetify3.VSelect(
             label="clustering method",
@@ -475,15 +474,60 @@ with SinglePageWithDrawerLayout(server) as layout:
                 html.Div("repulsion_strength {{repulsion_strength}}")
                 html.Div("dimension {{dimension}}")
     with layout.content:
-        with vuetify3.VContainer(fluid=True):
-            with vuetify3.VRow(dense=True):
-                vuetify3.VSpacer()
-                figure = plotly.Figure(
-                    display_logo=False,
-                    display_mode_bar="true",
-                    # selected = (on_selection, "[ 'selected', utils.safe($event)"]),
-                )
-                server.controller.figure_update = figure.update
+        with vuetify3.VContainer(fluid=True, classes="fill-height"):
+            with vuetify3.VCol(classes="fill-height"):
+                with vuetify3.VRow(style="height:50%"):
+                    figure_scatter = plotly.Figure(
+                        style="flex:1",
+                        display_logo=False,
+                        display_mode_bar="true",
+                        # selected = (on_selection, "[ 'selected', utils.safe($event)"]),
+                        selected="console.log($event.points.map((v)=>({x:v.x, y:v,y} )  ))",
+                    )
+                    server.controller.figure_scatter_update = figure_scatter.update
+                    html.Div("hello", style="flex:1", classes="bg-red")
+                with vuetify3.VRow(style="height:50%"):
+                    figure_parallel_coords = plotly.Figure(
+                        style="flex:1",
+                        display_logo=False,
+                        display_mode_bar="true",
+                        selected="console.log('selected',$event)",
+                        # after_export =
+                        # after_plot:
+                        # animated:
+                        # animating_frame:
+                        # animation_interrupted:
+                        # auto_size:
+                        # before_export:
+                        # button_clicked:
+                        # click:
+                        click="console.log('click',$event)",
+                        click_annotation="console.log('click_annotation',$event)",
+                        # click_annotation:
+                        # deselect:
+                        # double_click:
+                        # framework:
+                        # hover:
+                        # legend_click:
+                        # legend_double_click:
+                        # relayout:
+                        # restyle:
+                        # redraw:
+                        # selected:
+                        # selecting:
+                        selecting="console.log('selecting',$event)",
+                        slider_change="console.log('slider_change',$event)",
+                        # slider_end:
+                        # slider_start:
+                        # transitioning:
+                        # transition_interrupted:
+                        # unhover:
+                        # selected = (on_selection, "[ 'selected', utils.safe($event)"]),
+                        # selected = (on_selection, "[ 'selected', utils.safe($event)"]),
+                    )
+                    server.controller.figure_parallel_coords_update = (
+                        figure_parallel_coords.update
+                    )
 
 # -----------------------------------------------------------------------------
 # Main
