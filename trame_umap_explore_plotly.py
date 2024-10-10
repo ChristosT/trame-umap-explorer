@@ -251,16 +251,17 @@ state.trame__title = "Plotly"
 with SinglePageWithDrawerLayout(server) as layout:
     layout.title.set_text("trame+plotly+umap")
 
-    with layout.drawer:
-        vuetify3.VSlider(
+    with layout.toolbar as tb:
+        vuetify3.VTextField(
+            type="number",
             label="sample_size",
-            v_model=("sample_size", DEFAULTS["sample_size"]),
-            min=100,
-            max=100000,  # data.shape[0],
-            step=100,
+            v_model_number=("sample_size", DEFAULTS["sample_size"]),
             hide_details=True,
-            thumb_label=True,
+            raw_attrs=[':min="100"', ':step="100"'],
         )
+        print(tb)
+
+    with layout.drawer:
         vuetify3.VSelect(
             label="method",
             v_model=(
