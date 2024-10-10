@@ -297,9 +297,6 @@ with SinglePageWithDrawerLayout(server) as layout:
             classes="mb-2 mx-1", v_show="dimensionality_reduction_method === 'umap'"
         ):
             with vuetify3.VCardText():
-                vuetify3.VSpacer()
-                vuetify3.VSpacer()
-                vuetify3.VSpacer()
                 vuetify3.VSlider(
                     label="min_dist",
                     v_model=("min_dist", DEFAULTS["min_dist"]),
@@ -309,8 +306,6 @@ with SinglePageWithDrawerLayout(server) as layout:
                     hide_details=True,
                     thumb_label=True,
                 )
-                vuetify3.VSpacer()
-                vuetify3.VSpacer()
                 vuetify3.VSlider(
                     label="n_neighbors",
                     v_model=("n_neighbors", DEFAULTS["n_neighbors"]),
@@ -320,8 +315,6 @@ with SinglePageWithDrawerLayout(server) as layout:
                     hide_details=True,
                     thumb_label=True,
                 )
-                vuetify3.VSpacer()
-                vuetify3.VSpacer()
                 vuetify3.VSlider(
                     label="spread",
                     v_model=("spread", DEFAULTS["spread"]),
@@ -343,6 +336,8 @@ with SinglePageWithDrawerLayout(server) as layout:
                     hide_details=True,
                     thumb_label=True,
                 )
+        with vuetify3.VCard(classes="mb-2 mx-1"):
+            with vuetify3.VCardText():
                 vuetify3.VSelect(
                     v_model=("color_by", None),
                     items=(
@@ -386,93 +381,93 @@ with SinglePageWithDrawerLayout(server) as layout:
                     ),
                 )
 
-        vuetify3.VSelect(
-            label="clustering method",
-            v_model=(
-                "clustering_method",
-                DEFAULTS["clustering_method"],
-            ),
-            items=(
-                "clustering_methods",
-                [
-                    {"title": "None", "value": None},
-                    {"title": "kmeans", "value": "kmeans"},
-                    {"title": "hdbscan", "value": "hdbscan"},
-                    {"title": "optics", "value": "optics"},
-                ],
-            ),
-        )
-        # kmeans panel
-        with html.Div(
-            v_show="clustering_method === 'kmeans'",
-        ):
-            vuetify3.VSpacer()
-            vuetify3.VSlider(
-                label="n_clusters",
-                v_model=("n_clusters", DEFAULTS["n_clusters"]),
-                min=1,
-                max=100,
-                step=1,
-                hide_details=True,
-                thumb_label=True,
-            )
-        with html.Div(
-            v_show="clustering_method === 'hdbscan'",
-        ):
-            vuetify3.VSpacer()
-            vuetify3.VSlider(
-                label="min_samples",
-                v_model=("min_samples", DEFAULTS["min_samples"]),
-                min=1,
-                max=1000,
-                step=1,
-                hide_details=True,
-                thumb_label=True,
-            )
-            vuetify3.VSlider(
-                label="min_cluster_size",
-                v_model=(
-                    "min_cluster_size",
-                    DEFAULTS["min_cluster_size"],
-                ),
-                min=1,
-                max=1000,
-                step=1,
-                hide_details=True,
-                thumb_label=True,
-            )
-        # optics panel
-        with html.Div(
-            v_show="clustering_method === 'optics'",
-        ):
-            vuetify3.VSpacer()
-            vuetify3.VSlider(
-                label="min_samples",
-                v_model=("min_samples", DEFAULTS["min_samples"]),
-                min=1,
-                max=100,
-                step=1,
-                hide_details=True,
-                thumb_label=True,
-            )
-            vuetify3.VSlider(
-                label="max_eps",
-                v_model=("max_eps", DEFAULTS["max_eps"]),
-                min=1,
-                max=200,
-                step=1,
-                hide_details=True,
-                thumb_label=True,
-            )
+                vuetify3.VSelect(
+                    label="clustering method",
+                    v_model=(
+                        "clustering_method",
+                        DEFAULTS["clustering_method"],
+                    ),
+                    items=(
+                        "clustering_methods",
+                        [
+                            {"title": "None", "value": None},
+                            {"title": "kmeans", "value": "kmeans"},
+                            {"title": "hdbscan", "value": "hdbscan"},
+                            {"title": "optics", "value": "optics"},
+                        ],
+                    ),
+                )
+                # kmeans panel
+                with html.Div(
+                    v_show="clustering_method === 'kmeans'",
+                ):
+                    vuetify3.VSpacer()
+                    vuetify3.VSlider(
+                        label="n_clusters",
+                        v_model=("n_clusters", DEFAULTS["n_clusters"]),
+                        min=1,
+                        max=100,
+                        step=1,
+                        hide_details=True,
+                        thumb_label=True,
+                    )
+                with html.Div(
+                    v_show="clustering_method === 'hdbscan'",
+                ):
+                    vuetify3.VSpacer()
+                    vuetify3.VSlider(
+                        label="min_samples",
+                        v_model=("min_samples", DEFAULTS["min_samples"]),
+                        min=1,
+                        max=1000,
+                        step=1,
+                        hide_details=True,
+                        thumb_label=True,
+                    )
+                    vuetify3.VSlider(
+                        label="min_cluster_size",
+                        v_model=(
+                            "min_cluster_size",
+                            DEFAULTS["min_cluster_size"],
+                        ),
+                        min=1,
+                        max=1000,
+                        step=1,
+                        hide_details=True,
+                        thumb_label=True,
+                    )
+                # optics panel
+                with html.Div(
+                    v_show="clustering_method === 'optics'",
+                ):
+                    vuetify3.VSpacer()
+                    vuetify3.VSlider(
+                        label="min_samples",
+                        v_model=("min_samples", DEFAULTS["min_samples"]),
+                        min=1,
+                        max=100,
+                        step=1,
+                        hide_details=True,
+                        thumb_label=True,
+                    )
+                    vuetify3.VSlider(
+                        label="max_eps",
+                        v_model=("max_eps", DEFAULTS["max_eps"]),
+                        min=1,
+                        max=200,
+                        step=1,
+                        hide_details=True,
+                        thumb_label=True,
+                    )
 
-        with vuetify3.VCard(classes="mb-2 mx-1"):
-            with vuetify3.VCardText():
-                html.Div("min_dist {{min_dist}}")
-                html.Div("n_neighbors {{n_neighbors}}")
-                html.Div("sample_size {{sample_size}}")
-                html.Div("spread {{spread}}")
-                html.Div("repulsion_strength {{repulsion_strength}}")
-                html.Div("dimension {{dimension}}")
+                with vuetify3.VCard(classes="mb-2 mx-1"):
+                    with vuetify3.VCardText():
+                        html.Div("min_dist {{min_dist}}")
+                        html.Div("n_neighbors {{n_neighbors}}")
+                        html.Div("sample_size {{sample_size}}")
+                        html.Div("spread {{spread}}")
+                        html.Div("repulsion_strength {{repulsion_strength}}")
+                        html.Div("dimension {{dimension}}")
     with layout.content:
         with vuetify3.VContainer(fluid=True, classes="fill-height"):
             with vuetify3.VCol(classes="fill-height"):
@@ -481,7 +476,6 @@ with SinglePageWithDrawerLayout(server) as layout:
                         style="flex:1",
                         display_logo=False,
                         display_mode_bar="true",
-                        # selected = (on_selection, "[ 'selected', utils.safe($event)"]),
                         selected="console.log($event.points.map((v)=>({x:v.x, y:v,y} )  ))",
                     )
                     server.controller.figure_scatter_update = figure_scatter.update
@@ -491,39 +485,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                         style="flex:1",
                         display_logo=False,
                         display_mode_bar="true",
-                        selected="console.log('selected',$event)",
-                        # after_export =
-                        # after_plot:
-                        # animated:
-                        # animating_frame:
-                        # animation_interrupted:
-                        # auto_size:
-                        # before_export:
-                        # button_clicked:
-                        # click:
-                        click="console.log('click',$event)",
-                        click_annotation="console.log('click_annotation',$event)",
-                        # click_annotation:
-                        # deselect:
-                        # double_click:
-                        # framework:
-                        # hover:
-                        # legend_click:
-                        # legend_double_click:
-                        # relayout:
-                        # restyle:
-                        # redraw:
-                        # selected:
-                        # selecting:
-                        selecting="console.log('selecting',$event)",
-                        slider_change="console.log('slider_change',$event)",
-                        # slider_end:
-                        # slider_start:
-                        # transitioning:
-                        # transition_interrupted:
-                        # unhover:
-                        # selected = (on_selection, "[ 'selected', utils.safe($event)"]),
-                        # selected = (on_selection, "[ 'selected', utils.safe($event)"]),
+                        restyle="console.log('restyle',$event)",
                     )
                     server.controller.figure_parallel_coords_update = (
                         figure_parallel_coords.update
