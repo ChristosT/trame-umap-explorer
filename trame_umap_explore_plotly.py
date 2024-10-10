@@ -9,6 +9,7 @@ from trame.app import get_server
 from trame.ui.vuetify3 import SinglePageWithDrawerLayout
 from trame.widgets import vuetify3, plotly, html
 import numpy as np
+import re
 import umap
 import sklearn.cluster as cluster
 from sklearn import decomposition
@@ -159,12 +160,21 @@ def get_color_args(color_by=None, clustering_method=None):
     return color_args
 
 
-def on_selection(selection_data):
+def on_scatter_selected_event(selection_data):
+    # example event [{'x': -0.1320136977614036, 'y': 0.772234734606532, 'metadata': [0.12115617198637327, 0, 0, 0.8788438280136267]}
     print(selection_data)
 
 
+def on_parallel_coords_select_event(selection_data):
+    # example event {'dimensions[0].constraintrange': [[0.3651979139717597, 0.48502199044130667]]}
+    key = list(selection_data.keys())[0]
+    channel = re.search(r"\d+", key).group()
+    constrained_range = selection_data[key][0]
+    print(f"{channel=}")
+    print(f"{constrained_range=}")
+
+
 def scatter(U, color_args=None, dimension=2):
-    print(f"{points.shape}")
     if dimension == 2:
         plot = go.Scatter(
             x=U[:, 0],
@@ -232,7 +242,6 @@ def update_plot():
         color_by=state.color_by, clustering_method=state.clustering_method
     )
     server.controller.figure_parallel_coords_update(parallel_coords())
-    print(f"{U.shape=}")
     server.controller.figure_scatter_update(
         scatter(
             U,
@@ -476,7 +485,10 @@ with SinglePageWithDrawerLayout(server) as layout:
                         style="flex:1",
                         display_logo=False,
                         display_mode_bar="true",
-                        selected="console.log($event.points.map((v)=>({x:v.x, y:v,y} )  ))",
+                        selected=(
+                            on_scatter_selected_event,
+                            "[$event.points.map((v)=>({x:v.x, y:v.y, metadata:v.customdata} ))]",
+                        ),
                     )
                     server.controller.figure_scatter_update = figure_scatter.update
                     html.Div("hello", style="flex:1", classes="bg-red")
@@ -485,7 +497,8 @@ with SinglePageWithDrawerLayout(server) as layout:
                         style="flex:1",
                         display_logo=False,
                         display_mode_bar="true",
-                        restyle="console.log('restyle',$event)",
+                        # restyle="console.log('restyle',$event)",
+                        restyle=(on_parallel_coords_select_event, "[$event[0]]"),
                     )
                     server.controller.figure_parallel_coords_update = (
                         figure_parallel_coords.update
