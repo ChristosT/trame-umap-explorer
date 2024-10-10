@@ -92,7 +92,7 @@ def fit_data(points):
 @state.change("color_by")
 def on_color_by(color_by, **kwargs):
     if U is not None:
-        server.controller.figure_update(scatter(U, COLOR_ARGS, state.dimension))
+        server.controller.figure_scatter_update(scatter(U, COLOR_ARGS, state.dimension))
 
 
 @state.change(
@@ -108,7 +108,8 @@ def on_clustering_method(**kwargs):
         COLOR_ARGS = get_color_args(
             color_by=state.color_by, clustering_method=state.clustering_method
         )
-        server.controller.figure_update(scatter(U, COLOR_ARGS, state.dimension))
+        server.controller.figure_scatter_update(scatter(U, COLOR_ARGS, state.dimension))
+        server.controller.figure_parallel_coords_update(parallel_coords())
 
 
 @state.change("marker_size")
@@ -117,7 +118,7 @@ def on_marker_size(marker_size, **kwargs):
     if U is not None:
         COLOR_ARGS["marker"]["size"] = marker_size
 
-        server.controller.figure_update(scatter(U, COLOR_ARGS, state.dimension))
+        server.controller.figure_scatter_update(scatter(U, COLOR_ARGS, state.dimension))
 
 
 def get_color_args(color_by=None, clustering_method=None):
@@ -188,6 +189,38 @@ def scatter(U, color_args=None, dimension=2):
     return go.Figure(data=plot).update_layout(margin=dict(l=10, r=10, t=25, b=10))
 
 
+def parallel_coords():
+    return go.Figure(
+        data=go.Parcoords(
+            line=dict(color=COLOR_ARGS["marker_color"]),
+            dimensions=list(
+                [
+                    dict(
+                        range=[0, 1],
+                        label="0",
+                        values=points[:, 0],
+                    ),
+                    dict(
+                        range=[0, 1],
+                        label="1",
+                        values=points[:, 1],
+                    ),
+                    dict(
+                        range=[0, 1],
+                        label="2",
+                        values=points[:, 2],
+                    ),
+                    dict(
+                        range=[0, 1],
+                        label="3",
+                        values=points[:, 3],
+                    ),
+                ]
+            ),
+        )
+    )
+
+
 # -----------------------------------------------------------------------------
 # Callbacks
 # -----------------------------------------------------------------------------
@@ -198,8 +231,9 @@ def update_plot():
     COLOR_ARGS = get_color_args(
         color_by=state.color_by, clustering_method=state.clustering_method
     )
+    server.controller.figure_parallel_coords_update(parallel_coords())
     print(f"{U.shape=}")
-    server.controller.figure_update(
+    server.controller.figure_scatter_update(
         scatter(
             U,
             COLOR_ARGS,
