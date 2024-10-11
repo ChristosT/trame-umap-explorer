@@ -39,10 +39,12 @@ data = np.load("display_data.npz")["arr_0"]
 sums = np.sum(data, axis=1)
 data /= sums[:, None]
 num_rows_to_select = 5000
+NUMBER_OF_CHANNELS = data.shape[1]
 # Randomly select unique row indices
 random_indices = np.random.choice(data.shape[0], num_rows_to_select, replace=False)
 points = data[random_indices]
 U = None
+SCATTER_SELECTION = dict()
 
 
 def umap_fit(points, min_dist, n_neighbors, spread, repulsion_strength, dimension):
@@ -162,7 +164,15 @@ def get_color_args(color_by=None, clustering_method=None):
 
 def on_scatter_selected_event(selection_data):
     # example event [{'x': -0.1320136977614036, 'y': 0.772234734606532, 'metadata': [0.12115617198637327, 0, 0, 0.8788438280136267]}
-    print(selection_data)
+
+    # update the parallel coordinates simple with the min/max for each channel
+    scatter_selection = dict()
+    for i in range(NUMBER_OF_CHANNELS):
+        scatter_selection[i] = [
+            np.min([item["metadata"][i] for item in selection_data]),
+            np.max([item["metadata"][i] for item in selection_data]),
+        ]
+    server.controller.figure_parallel_coords_update(parallel_coords(scatter_selection))
 
 
 def on_parallel_coords_select_event(selection_data):
@@ -199,34 +209,24 @@ def scatter(U, color_args=None, dimension=2):
     return go.Figure(data=plot).update_layout(margin=dict(l=10, r=10, t=25, b=10))
 
 
-def parallel_coords():
+def parallel_coords(constraintranges=None):
+    dimensions = []
+    print(constraintranges)
+    for i in range(NUMBER_OF_CHANNELS):
+        dim = dict(
+            range=[0, 1],
+            label=str(i),
+            values=points[:, i],
+        )
+        if constraintranges is not None:  # and i in constraintranges.keys():
+            dim["constraintrange"] = constraintranges[i]
+
+        dimensions.append(dim)
+
     return go.Figure(
         data=go.Parcoords(
+            dimensions=dimensions,
             line=dict(color=COLOR_ARGS["marker_color"]),
-            dimensions=list(
-                [
-                    dict(
-                        range=[0, 1],
-                        label="0",
-                        values=points[:, 0],
-                    ),
-                    dict(
-                        range=[0, 1],
-                        label="1",
-                        values=points[:, 1],
-                    ),
-                    dict(
-                        range=[0, 1],
-                        label="2",
-                        values=points[:, 2],
-                    ),
-                    dict(
-                        range=[0, 1],
-                        label="3",
-                        values=points[:, 3],
-                    ),
-                ]
-            ),
         )
     )
 
@@ -286,22 +286,14 @@ with SinglePageWithDrawerLayout(server) as layout:
             ),
         )
         vuetify3.VBtn("Go", click=update_plot)
+        # pca hyperparameters
         with vuetify3.VCard(
             classes="mb-2 mx-1", v_show="dimensionality_reduction_method === 'pca'"
         ):
             with vuetify3.VCardText():
-                vuetify3.VSelect(
-                    label="dimension",
-                    v_model=("dimension", 2),
-                    items=(
-                        "dimensions",
-                        [
-                            {"title": "2", "value": 2},
-                            {"title": "3", "value": 3},
-                        ],
-                    ),
-                )
+                pass
 
+        # umap hyperparameters
         with vuetify3.VCard(
             classes="mb-2 mx-1", v_show="dimensionality_reduction_method === 'umap'"
         ):
@@ -345,6 +337,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                     hide_details=True,
                     thumb_label=True,
                 )
+        # common style options
         with vuetify3.VCard(classes="mb-2 mx-1"):
             with vuetify3.VCardText():
                 vuetify3.VSelect(
