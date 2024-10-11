@@ -7,12 +7,13 @@ import plotly.graph_objects as go
 
 from trame.app import get_server
 from trame.ui.vuetify3 import SinglePageWithDrawerLayout
-from trame.widgets import vuetify3, plotly, html
+from trame.widgets import vuetify3, plotly, html, vtk
 import numpy as np
 import re
 import umap
 import sklearn.cluster as cluster
 from sklearn import decomposition
+from volume_view import VolumeView
 
 DEFAULTS = {
     "dimensionality_reduction_method": "umap",
@@ -45,6 +46,7 @@ random_indices = np.random.choice(data.shape[0], num_rows_to_select, replace=Fal
 points = data[random_indices]
 U = None
 SCATTER_SELECTION = dict()
+VOLUME_VIEW = VolumeView()
 
 
 def umap_fit(points, min_dist, n_neighbors, spread, repulsion_strength, dimension):
@@ -484,7 +486,13 @@ with SinglePageWithDrawerLayout(server) as layout:
                         ),
                     )
                     server.controller.figure_scatter_update = figure_scatter.update
-                    html.Div("hello", style="flex:1", classes="bg-red")
+
+                    with vtk.VtkRemoteView(
+                        VOLUME_VIEW.render_window, interactive_ratio=1, style="flex:1"
+                    ) as html_view:
+                        server.controller.reset_camera = html_view.reset_camera
+                        server.controller.view_update = html_view.update
+
                 with vuetify3.VRow(style="height:50%"):
                     figure_parallel_coords = plotly.Figure(
                         style="flex:1",
