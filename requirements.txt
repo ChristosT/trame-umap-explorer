@@ -1,0 +1,6 @@
+trame
+trame-vuetify
+trame-plotly
+trame-components
+sklearn
+umap-learn
