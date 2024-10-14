@@ -415,7 +415,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                     label="n_neighbors",
                     v_model=("n_neighbors", DEFAULTS["n_neighbors"]),
                     min=1,
-                    max=100,
+                    max=1000,
                     step=1,
                     hide_details=True,
                     thumb_label=True,
