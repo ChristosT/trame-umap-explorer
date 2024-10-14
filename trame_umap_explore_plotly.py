@@ -285,14 +285,19 @@ def on_parallel_coords_select_event(selection_data):
 
 
 def scatter(U, color_args=None, dimension=2):
+    customdata = SAMPLE
+    hovertemplate = "%{customdata[0]:.3f} <br> %{customdata[1]:.3f} <br> %{customdata[2]:.3f} <br> %{customdata[3]:.3f} "
+    if state.clustering_method == "manual":
+        customdata = np.column_stack((SAMPLE, MASK_SAMPLE))
+        hovertemplate += "<br> %{customdata[7]}"
     if dimension == 2:
         plot = go.Scatter(
             x=U[:, 0],
             y=U[:, 1],
             mode="markers",
             **color_args,
-            customdata=SAMPLE,
-            hovertemplate="%{customdata[0]:.3f} <br> %{customdata[1]:.3f} <br> %{customdata[2]:.3f} <br> %{customdata[3]:.3f} ",
+            customdata=customdata,
+            hovertemplate=hovertemplate,
             name="",
         )
     else:
