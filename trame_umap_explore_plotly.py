@@ -41,12 +41,17 @@ sums = np.sum(data, axis=1)
 data /= sums[:, None]
 num_rows_to_select = 5000
 NUMBER_OF_CHANNELS = data.shape[1]
-# Randomly select unique row indices
-random_indices = np.random.choice(data.shape[0], num_rows_to_select, replace=False)
-points = data[random_indices]
 U = None
 SCATTER_SELECTION = dict()
 VOLUME_VIEW = VolumeView()
+SAMPLE = None
+
+
+def sample_data(data, sample_size):
+    # Randomly select unique row indices
+    global SAMPLE
+    random_indices = np.random.choice(data.shape[0], sample_size, replace=False)
+    SAMPLE = data[random_indices]
 
 
 def umap_fit(points, min_dist, n_neighbors, spread, repulsion_strength, dimension):
@@ -74,12 +79,6 @@ state = server.state
 state.trame__title = "umap explorer"
 
 
-def sample_data(data, sample_size):
-    global points
-    random_indices = np.random.choice(data.shape[0], sample_size, replace=False)
-    points = data[random_indices]
-
-
 def fit_data(points):
     if state.dimensionality_reduction_method == "umap":
         return umap_fit(
@@ -98,6 +97,11 @@ def fit_data(points):
 def on_color_by(color_by, **kwargs):
     if U is not None:
         server.controller.figure_scatter_update(scatter(U, COLOR_ARGS, state.dimension))
+
+
+@state.change("sample_size")
+def on_sample_size(sample_size, **kwargs):
+    sample_data(data, sample_size)
 
 
 @state.change(
@@ -134,14 +138,14 @@ def get_color_args(color_by=None, clustering_method=None):
         else:
             if color_by < 10:
                 color_args = {
-                    "marker_color": points[:, color_by],
+                    "marker_color": SAMPLE[:, color_by],
                     "marker": {"colorscale": "blues", "size": size},
                 }
             else:
                 color0 = color_by // 10
                 color1 = color_by % 10
                 color_args = {
-                    "marker_color": points[:, color0] + points[:, color1],
+                    "marker_color": SAMPLE[:, color0] + SAMPLE[:, color1],
                     "marker": {"colorscale": "blues", "size": size},
                 }
     else:
@@ -193,7 +197,7 @@ def scatter(U, color_args=None, dimension=2):
             y=U[:, 1],
             mode="markers",
             **color_args,
-            customdata=points,
+            customdata=SAMPLE,
             hovertemplate="%{customdata[0]:.3f} <br> %{customdata[1]:.3f} <br> %{customdata[2]:.3f} <br> %{customdata[3]:.3f} ",
             name="",
         )
@@ -204,7 +208,7 @@ def scatter(U, color_args=None, dimension=2):
             z=U[:, 2],
             mode="markers",
             **color_args,
-            customdata=points,
+            customdata=SAMPLE,
             hovertemplate="%{customdata[0]:.3f} <br> %{customdata[1]:.3f} <br> %{customdata[2]:.3f} <br> %{customdata[3]:.3f} ",
             name="",
         )
@@ -218,7 +222,7 @@ def parallel_coords(constraintranges=None):
         dim = dict(
             range=[0, 1],
             label=str(i),
-            values=points[:, i],
+            values=SAMPLE[:, i],
         )
         if constraintranges is not None:  # and i in constraintranges.keys():
             dim["constraintrange"] = constraintranges[i]
@@ -238,8 +242,7 @@ def parallel_coords(constraintranges=None):
 # -----------------------------------------------------------------------------
 def update_plot():
     global U, COLOR_ARGS
-    sample_data(data, state.sample_size)
-    U = fit_data(points)
+    U = fit_data(SAMPLE)
     COLOR_ARGS = get_color_args(
         color_by=state.color_by, clustering_method=state.clustering_method
     )
@@ -481,8 +484,8 @@ with SinglePageWithDrawerLayout(server) as layout:
                         display_logo=False,
                         display_mode_bar="true",
                         selected=
-                           # "console.log($event)",
-                            (
+                        # "console.log($event)",
+                        (
                             on_scatter_selected_event,
                             "[$event.points.map((v)=>({x:v.x, y:v.y, id: v.pointIndex, metadata:v.customdata} ))]",
                         ),
@@ -512,4 +515,5 @@ with SinglePageWithDrawerLayout(server) as layout:
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    sample_data(data, DEFAULTS["sample_size"])
     server.start()
