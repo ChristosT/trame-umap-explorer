@@ -11,6 +11,8 @@ from trame.widgets import vuetify3, plotly, html, vtk
 import numpy as np
 import re
 import umap
+import h5py
+import numba
 import sklearn.cluster as cluster
 from sklearn import decomposition
 from volume_view import VolumeView
@@ -31,16 +33,68 @@ DEFAULTS = {
     "max_eps": 100,
 }
 RANDOM_STATE = 42
+FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
+DATA = None
 
 
-# -----------------------------------------------------------------------------
-# Charts
-# -----------------------------------------------------------------------------
-data = np.load("display_data.npz")["arr_0"]
-sums = np.sum(data, axis=1)
-data /= sums[:, None]
-num_rows_to_select = 5000
-NUMBER_OF_CHANNELS = data.shape[1]
+def load_hdf5_dataset(path):
+    labels = []
+    data = []
+
+    with h5py.File(path, "r") as f:
+        for key in f:
+            labels.append(key)
+            data.append(f[key][()])
+
+    data = np.stack(data, axis=3)
+    return labels, data
+
+
+@numba.njit(cache=True, nogil=True)
+def _remove_padding_uniform(data: np.ndarray) -> np.ndarray:
+    num_channels = data.shape[-1]
+    zero_data = np.isclose(data, 0).sum(axis=3) == num_channels
+
+    # This is the number to crop
+    n = 0
+    indices = np.array([n, -n - 1])
+    while (
+        zero_data[indices].all()
+        & zero_data[:, indices].all()
+        & zero_data[:, :, indices].all()
+    ):
+        n += 1
+        indices = np.array([n, -n - 1])
+
+    if n != 0:
+        data = data[n : -n - 1, n : -n - 1, n : -n - 1]
+
+    return data
+
+
+def preprocess(filename):
+    global LABELS, DATA, NUMBER_OF_CHANNELS
+    LABELS, original_data = load_hdf5_dataset(filename)
+    original_data = _remove_padding_uniform(original_data)
+    data_shape = original_data.shape[:-1]
+    num_channels = original_data.shape[-1]
+    # flatten
+    raw_unpadded_flattened_data = original_data.reshape(
+        np.prod(data_shape), num_channels
+    )
+    data = raw_unpadded_flattened_data.copy()
+
+    nonzero_indices = ~np.all(np.isclose(data, 0), axis=1)
+    # normalize per voxel
+    sums = np.sum(data, axis=1)
+    data[nonzero_indices] = data / sums[:, None]
+
+    # drop zeros
+
+    DATA = data[nonzero_indices]
+    NUMBER_OF_CHANNELS = num_channels
+
+
 U = None
 SCATTER_SELECTION = dict()
 VOLUME_VIEW = VolumeView()
@@ -101,7 +155,7 @@ def on_color_by(color_by, **kwargs):
 
 @state.change("sample_size")
 def on_sample_size(sample_size, **kwargs):
-    sample_data(data, sample_size)
+    sample_data(DATA, sample_size)
 
 
 @state.change(
@@ -221,7 +275,7 @@ def parallel_coords(constraintranges=None):
     for i in range(NUMBER_OF_CHANNELS):
         dim = dict(
             range=[0, 1],
-            label=str(i),
+            label=LABELS[i],
             values=SAMPLE[:, i],
         )
         if constraintranges is not None:  # and i in constraintranges.keys():
@@ -515,5 +569,6 @@ with SinglePageWithDrawerLayout(server) as layout:
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    sample_data(data, DEFAULTS["sample_size"])
+    preprocess(filename=FILENAME)
+    sample_data(DATA, DEFAULTS["sample_size"])
     server.start()
