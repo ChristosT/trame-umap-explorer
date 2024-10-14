@@ -78,21 +78,29 @@ def preprocess(filename):
     original_data = _remove_padding_uniform(original_data)
     data_shape = original_data.shape[:-1]
     num_channels = original_data.shape[-1]
+    NUMBER_OF_CHANNELS = num_channels
     # flatten
     raw_unpadded_flattened_data = original_data.reshape(
         np.prod(data_shape), num_channels
     )
     data = raw_unpadded_flattened_data.copy()
 
-    nonzero_indices = ~np.all(np.isclose(data, 0), axis=1)
-    # normalize per voxel
-    sums = np.sum(data, axis=1)
-    data[nonzero_indices] = data / sums[:, None]
+    # add indices
+    I = np.indices(data_shape).reshape(3, -1).T
+    data = np.concatenate((data, I), axis=1)
+    data[:, 4] /= data_shape[0]
+    data[:, 5] /= data_shape[1]
+    data[:, 6] /= data_shape[2]
+
+    # get a view without the indices
+    data_view = data[:, :num_channels]
+    nonzero_indices = ~np.all(np.isclose(data_view, 0), axis=1)
+    data_view = data[nonzero_indices, :num_channels]
+    sums = np.sum(data_view, axis=1)
+    data[nonzero_indices, :num_channels] = data_view / sums[:, None]
 
     # drop zeros
-
     DATA = data[nonzero_indices]
-    NUMBER_OF_CHANNELS = num_channels
 
 
 U = None
@@ -108,7 +116,9 @@ def sample_data(data, sample_size):
     SAMPLE = data[random_indices]
 
 
-def umap_fit(points, min_dist, n_neighbors, spread, repulsion_strength, dimension):
+def umap_fit(
+    points, min_dist, n_neighbors, spread, repulsion_strength, dimension, use_coords
+):
     fit = umap.UMAP(
         min_dist=min_dist,
         repulsion_strength=repulsion_strength,
@@ -116,14 +126,22 @@ def umap_fit(points, min_dist, n_neighbors, spread, repulsion_strength, dimensio
         n_neighbors=n_neighbors,
         n_components=dimension,
     )
-    u = fit.fit_transform(points)
+    if use_coords:
+        dataset = points
+    else:
+        dataset = points[:, :NUMBER_OF_CHANNELS]
+    u = fit.fit_transform(dataset)
     print("Done")
     return u
 
 
-def pca_fit(points, dimension):
+def pca_fit(points, dimension, use_coords):
     fit = decomposition.PCA(n_components=dimension)
-    u = fit.fit_transform(points)
+    if use_coords:
+        dataset = points
+    else:
+        dataset = points[:, :NUMBER_OF_CHANNELS]
+    u = fit.fit_transform(dataset)
     print("Done")
     return u
 
@@ -142,9 +160,10 @@ def fit_data(points):
             state.spread,
             state.repulsion_strength,
             state.dimension,
+            state.use_coords,
         )
     elif state.dimensionality_reduction_method == "pca":
-        return pca_fit(points, state.dimension)
+        return pca_fit(points, state.dimension, state.use_coords)
 
 
 @state.change("color_by")
@@ -429,6 +448,17 @@ with SinglePageWithDrawerLayout(server) as layout:
                     step=0.01,
                     hide_details=True,
                     thumb_label=True,
+                )
+                vuetify3.VSwitch(
+                    v_model=("use_coords", False),
+                    label="Use ijk",
+                    density="compact",
+                    hide_details=True,
+                    inset=True,
+                    color="green",
+                    classes="ml-2",
+                    true_icon="mdi-check",
+                    false_icon="mdi-close",
                 )
                 vuetify3.VSelect(
                     label="dimension",
