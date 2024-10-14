@@ -480,9 +480,11 @@ with SinglePageWithDrawerLayout(server) as layout:
                         style="flex:1",
                         display_logo=False,
                         display_mode_bar="true",
-                        selected=(
+                        selected=
+                           # "console.log($event)",
+                            (
                             on_scatter_selected_event,
-                            "[$event.points.map((v)=>({x:v.x, y:v.y, metadata:v.customdata} ))]",
+                            "[$event.points.map((v)=>({x:v.x, y:v.y, id: v.pointIndex, metadata:v.customdata} ))]",
                         ),
                     )
                     server.controller.figure_scatter_update = figure_scatter.update
