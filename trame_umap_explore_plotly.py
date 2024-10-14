@@ -444,7 +444,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                         DEFAULTS["marker_size"],
                     ),
                     min=0.1,
-                    max=3,
+                    max=10,
                     step=0.01,
                     hide_details=True,
                     thumb_label=True,
