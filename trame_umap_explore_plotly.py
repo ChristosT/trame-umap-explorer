@@ -75,7 +75,7 @@ def _remove_padding_uniform(data: np.ndarray) -> np.ndarray:
     return data
 
 
-def preprocess(filename, labelfile):
+def preprocess(filename, labelfile, drop_ones=False):
     global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL
     LABELS, original_data = load_hdf5_dataset(filename)
     original_data = _remove_padding_uniform(original_data)
@@ -102,13 +102,18 @@ def preprocess(filename, labelfile):
     sums = np.sum(data_view, axis=1)
     data[nonzero_indices, :num_channels] = data_view / sums[:, None]
 
-    # drop zeros
-    DATA = data[nonzero_indices]
+    # drop ones
+    mask = nonzero_indices
+    if drop_ones:
+        nonone_indices = ~np.any(np.isclose(data, 1), axis=1)
+        mask = mask & nonone_indices
+
+    DATA = data[mask]
 
     if os.path.isfile(labelfile):
         MANUAL_LABEL = np.load(labelfile)
         MANUAL_LABEL = MANUAL_LABEL.reshape(np.prod(MANUAL_LABEL.shape))
-        MANUAL_LABEL = MANUAL_LABEL[nonzero_indices]
+        MANUAL_LABEL = MANUAL_LABEL[mask]
 
 
 U = None
@@ -647,6 +652,6 @@ with SinglePageWithDrawerLayout(server) as layout:
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    preprocess(filename=FILENAME, labelfile=LABELMAP_FILENAME)
+    preprocess(filename=FILENAME, labelfile=LABELMAP_FILENAME, drop_ones=True)
     sample_data(DATA, DEFAULTS["sample_size"])
     server.start()
