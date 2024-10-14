@@ -32,6 +32,7 @@ DEFAULTS = {
     "min_samples": 2,
     "min_cluster_size": 5,
     "max_eps": 100,
+    "metric": "euclidean",
 }
 RANDOM_STATE = 42
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
@@ -126,7 +127,14 @@ def sample_data(data, sample_size):
 
 
 def umap_fit(
-    points, min_dist, n_neighbors, spread, repulsion_strength, dimension, use_coords
+    points,
+    min_dist,
+    n_neighbors,
+    spread,
+    repulsion_strength,
+    dimension,
+    metric,
+    use_coords,
 ):
     fit = umap.UMAP(
         min_dist=min_dist,
@@ -134,6 +142,7 @@ def umap_fit(
         spread=spread,
         n_neighbors=n_neighbors,
         n_components=dimension,
+        metric=metric,
     )
     if use_coords:
         dataset = points
@@ -169,6 +178,7 @@ def fit_data(points):
             state.spread,
             state.repulsion_strength,
             state.dimension,
+            state.metric,
             state.use_coords,
         )
     elif state.dimensionality_reduction_method == "pca":
@@ -425,6 +435,27 @@ with SinglePageWithDrawerLayout(server) as layout:
                     step=1,
                     hide_details=True,
                     thumb_label=True,
+                )
+                vuetify3.VSelect(
+                    v_model=("metric", DEFAULTS["metric"]),
+                    label="metric",
+                    items=(
+                        "metric",
+                        [
+                            {"title": "euclidean", "value": "euclidean"},
+                            {"title": "manhattan", "value": "manhattan"},
+                            {"title": "chebyshev", "value": "chebyshev"},
+                            {"title": "minkowski", "value": "minkowski"},
+                            {"title": "canberra", "value": "canberra"},
+                            {"title": "braycurtis", "value": "braycurtis"},
+                            {"title": "haversine", "value": "haversine"},
+                            {"title": "mahalanobis", "value": "mahalanobis"},
+                            {"title": "wminkowski", "value": "wminkowski"},
+                            {"title": "seuclidean", "value": "seuclidean"},
+                            {"title": "cosine", "value": "cosine"},
+                            {"title": "correlation", "value": "correlation"},
+                        ],
+                    ),
                 )
         # common style options
         with vuetify3.VCard(classes="mb-2 mx-1"):
