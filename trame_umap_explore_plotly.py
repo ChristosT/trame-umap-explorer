@@ -13,6 +13,7 @@ import re
 import umap
 import h5py
 import numba
+import os.path
 import sklearn.cluster as cluster
 from sklearn import decomposition
 from volume_view import VolumeView
@@ -34,6 +35,7 @@ DEFAULTS = {
 }
 RANDOM_STATE = 42
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
+LABELMAP_FILENAME = "miec_rough_label_map.npy"
 DATA = None
 
 
@@ -72,8 +74,8 @@ def _remove_padding_uniform(data: np.ndarray) -> np.ndarray:
     return data
 
 
-def preprocess(filename):
-    global LABELS, DATA, NUMBER_OF_CHANNELS
+def preprocess(filename, labelfile):
+    global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL
     LABELS, original_data = load_hdf5_dataset(filename)
     original_data = _remove_padding_uniform(original_data)
     data_shape = original_data.shape[:-1]
@@ -102,18 +104,25 @@ def preprocess(filename):
     # drop zeros
     DATA = data[nonzero_indices]
 
+    if os.path.isfile(labelfile):
+        MANUAL_LABEL = np.load(labelfile)
+        MANUAL_LABEL = MANUAL_LABEL.reshape(np.prod(MANUAL_LABEL.shape))
+        MANUAL_LABEL = MANUAL_LABEL[nonzero_indices]
+
 
 U = None
 SCATTER_SELECTION = dict()
 VOLUME_VIEW = VolumeView()
 SAMPLE = None
+MASK_SAMPLE = None
 
 
 def sample_data(data, sample_size):
     # Randomly select unique row indices
-    global SAMPLE
+    global SAMPLE, MASK_SAMPLE
     random_indices = np.random.choice(data.shape[0], sample_size, replace=False)
     SAMPLE = data[random_indices]
+    MASK_SAMPLE = MANUAL_LABEL[random_indices]
 
 
 def umap_fit(
@@ -236,6 +245,8 @@ def get_color_args(color_by=None, clustering_method=None):
                 min_samples=state.min_samples, max_eps=state.max_eps
             ).fit_predict(U)
             color_args = {"marker_color": labels, "marker": {"size": size}}
+        elif clustering_method == "manual":
+            color_args = {"marker_color": list(MASK_SAMPLE), "marker": {"size": size}}
         else:
             pass
     return color_args
@@ -485,6 +496,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                             {"title": "kmeans", "value": "kmeans"},
                             {"title": "hdbscan", "value": "hdbscan"},
                             {"title": "optics", "value": "optics"},
+                            {"title": "manual", "value": "manual"},
                         ],
                     ),
                 )
@@ -599,6 +611,6 @@ with SinglePageWithDrawerLayout(server) as layout:
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    preprocess(filename=FILENAME)
+    preprocess(filename=FILENAME, labelfile=LABELMAP_FILENAME)
     sample_data(DATA, DEFAULTS["sample_size"])
     server.start()
