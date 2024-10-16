@@ -134,6 +134,21 @@ def preprocess(filename, labelfile, drop_ones=False):
         MANUAL_LABEL = MANUAL_LABEL[mask]
 
 
+
+def preprocess_rba(filename):
+    original_data = np.load(filename)
+    data_shape = original_data.shape[:-1]
+    num_channels = original_data.shape[-1]
+    # flatten
+    flattened_data = original_data.reshape(np.prod(data_shape), num_channels)
+    nonzero_indices = ~np.all(np.isclose(flattened_data, 0), axis=1)
+
+    VOLUME_VIEW.set_data(original_data)
+    mask_ref = VOLUME_VIEW.mask_reference
+    mask_ref[nonzero_indices] = 1
+    VOLUME_VIEW.mask_data.Modified()
+
+
 U = None
 SCATTER_SELECTION = dict()
 VOLUME_VIEW = VolumeView()
@@ -377,6 +392,15 @@ def parallel_coords(constraintranges=None):
     )
 
 
+def update_volume_view(mask_ids=None):
+    if mask_ids is not None:
+        mask_ref = VOLUME_VIEW.mask_reference
+        mask_ref[:] = False
+        mask_ref[mask_ids] = True
+        VOLUME_VIEW.mask_data.Modified()
+        server.controller.view_update()
+
+
 # -----------------------------------------------------------------------------
 # Callbacks
 # -----------------------------------------------------------------------------
@@ -432,6 +456,7 @@ with SinglePageWithDrawerLayout(server) as layout:
             ),
         )
         vuetify3.VBtn("Go", click=update_plot)
+        vuetify3.VBtn("Reset 3D camera", click=server.controller.reset_camera)
         # pca hyperparameters
         with vuetify3.VCard(
             classes="mb-2 mx-1", v_show="dimensionality_reduction_method === 'pca'"
@@ -721,6 +746,9 @@ with SinglePageWithDrawerLayout(server) as layout:
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    preprocess(filename=FILENAME, labelfile=LABELMAP_FILENAME, drop_ones=True)
+    preprocess(filename=FILENAME, labelfile=LABELMAP_FILENAME, drop_ones=False)
+    FILENAME = "./rgba_dataset.npy"
+    preprocess_rba(filename=FILENAME)
+    server.controller.view_update()
     sample_data(DATA, DEFAULTS["sample_size"])
     server.start()
