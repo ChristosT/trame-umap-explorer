@@ -78,6 +78,17 @@ def _remove_padding_uniform(data: np.ndarray) -> np.ndarray:
 
     return data
 
+@numba.njit(cache=True, nogil=True)
+def _normalize_data(data: np.ndarray, new_min: float = 0, new_max: float = 1):
+    max_val = data.max()
+    min_val = data.min()
+
+    return (new_max - new_min) * (data.astype(np.float64) - min_val) / (
+        max_val - min_val
+    ) + new_min
+
+
+
 
 def preprocess(filename, labelfile, drop_ones=False):
     global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL
@@ -91,6 +102,8 @@ def preprocess(filename, labelfile, drop_ones=False):
         np.prod(data_shape), num_channels
     )
     data = raw_unpadded_flattened_data.copy()
+    data = _normalize_data(data)
+
 
     # add indices
     I = np.indices(data_shape).reshape(3, -1).T
