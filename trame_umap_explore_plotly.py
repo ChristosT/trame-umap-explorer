@@ -34,14 +34,17 @@ DEFAULTS = {
     "min_cluster_size": 5,
     "max_eps": 100,
     "metric": "euclidean",
-    "perplexity":30.0,
-    "max_iter":250,
+    "perplexity": 30.0,
+    "max_iter": 250,
 }
-RANDOM_STATE = 42
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
 LABELMAP_FILENAME = "miec_rough_label_map.npy"
+#  the entire dataset in (points,nchannels format)
 DATA = None
 MANUAL_LABEL = None
+
+# keep track of user provided constains in parallel coordinates
+CURRENT_CONSTRAINS = dict()
 
 
 def load_hdf5_dataset(path):
@@ -89,10 +92,8 @@ def _normalize_data(data: np.ndarray, new_min: float = 0, new_max: float = 1):
     ) + new_min
 
 
-
-
 def preprocess(filename, labelfile, drop_ones=False):
-    global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL
+    global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL, ORIGINAL_IDS_INDEX, CURRENT_CONSTRAINS
     LABELS, original_data = load_hdf5_dataset(filename)
     original_data = _remove_padding_uniform(original_data)
     data_shape = original_data.shape[:-1]
@@ -105,13 +106,17 @@ def preprocess(filename, labelfile, drop_ones=False):
     data = raw_unpadded_flattened_data.copy()
     data = _normalize_data(data)
 
-
-    # add indices
+    # add ijk indices
     I = np.indices(data_shape).reshape(3, -1).T
     data = np.concatenate((data, I), axis=1)
     data[:, 4] /= data_shape[0]
     data[:, 5] /= data_shape[1]
     data[:, 6] /= data_shape[2]
+
+    # add flat index
+    I = np.indices([data.shape[0]]).T
+    data = np.concatenate((data, I), axis=1)
+    ORIGINAL_IDS_INDEX = data.shape[1] - 1
 
     # get a view without the indices
     data_view = data[:, :num_channels]
@@ -133,6 +138,8 @@ def preprocess(filename, labelfile, drop_ones=False):
         MANUAL_LABEL = MANUAL_LABEL.reshape(np.prod(MANUAL_LABEL.shape))
         MANUAL_LABEL = MANUAL_LABEL[mask]
 
+    for i in range(len(LABELS)):
+        CURRENT_CONSTRAINS[i] = []
 
 
 def preprocess_rba(filename):
@@ -319,7 +326,7 @@ def get_color_args(color_by=None, clustering_method=None):
 
 
 def on_scatter_selected_event(selection_data):
-    # example event [{'x': -0.1320136977614036, 'y': 0.772234734606532, 'metadata': [0.12115617198637327, 0, 0, 0.8788438280136267]}
+    # example event [{'x': -0.1320136977614036, 'y': 0.772234734606532, 'id': 123, 'metadata': [0.12115617198637327, 0, 0, 0.8788438280136267]}
 
     # update the parallel coordinates simple with the min/max for each channel
     scatter_selection = dict()
@@ -329,15 +336,42 @@ def on_scatter_selected_event(selection_data):
             np.max([item["metadata"][i] for item in selection_data]),
         ]
     server.controller.figure_parallel_coords_update(parallel_coords(scatter_selection))
+    ids = [item["metadata"][-1] for item in selection_data]
+    update_volume_view(mask_ids=ids)
 
 
 def on_parallel_coords_select_event(selection_data):
+    global CURRENT_CONSTRAINS
     # example event {'dimensions[0].constraintrange': [[0.3651979139717597, 0.48502199044130667]]}
     key = list(selection_data.keys())[0]
-    channel = re.search(r"\d+", key).group()
-    constrained_range = selection_data[key][0]
+    channel = int(re.search(r"\d+", key).group())
+    constrained_ranges = selection_data[key]
     print(f"{channel=}")
-    print(f"{constrained_range=}")
+    print(f"{constrained_ranges=}")
+    #  keep track of all constrains since plotly only gices us the current selection
+
+    # reset constrain for this channel
+    if constrained_ranges is None:
+        CURRENT_CONSTRAINS[channel] = []
+    else:
+        # if it is one constrain we get [[a,b]] but if they are more [[[a,b],[c,d]]]
+        if type(constrained_ranges[0][0]) is float:
+            CURRENT_CONSTRAINS[channel] = constrained_ranges
+        else:
+            CURRENT_CONSTRAINS[channel] = constrained_ranges[0]
+
+    condition = True
+    print(CURRENT_CONSTRAINS)
+    for channel, channel_constrain in CURRENT_CONSTRAINS.items():
+        if channel_constrain:
+            for constrain in channel_constrain:
+                print(constrain)
+                condition &= (DATA[:, channel] > constrain[0]) & (
+                    DATA[:, channel] < constrain[1]
+                )
+    IDS = DATA[condition, ORIGINAL_IDS_INDEX].astype(np.int32)
+    print(IDS)
+    update_volume_view(IDS)
 
 
 def scatter(U, color_args=None, dimension=2):
