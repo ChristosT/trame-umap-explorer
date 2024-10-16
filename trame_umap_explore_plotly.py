@@ -16,7 +16,7 @@ import numba
 import os.path
 import sklearn.cluster as cluster
 from sklearn import decomposition
-from sklearn import manifold
+from sklearn.manifold import TSNE
 from volume_view import VolumeView
 
 DEFAULTS = {
@@ -77,6 +77,7 @@ def _remove_padding_uniform(data: np.ndarray) -> np.ndarray:
         data = data[n : -n - 1, n : -n - 1, n : -n - 1]
 
     return data
+
 
 @numba.njit(cache=True, nogil=True)
 def _normalize_data(data: np.ndarray, new_min: float = 0, new_max: float = 1):
@@ -146,7 +147,7 @@ def sample_data(data, sample_size):
     random_indices = np.random.choice(data.shape[0], sample_size, replace=False)
     SAMPLE = data[random_indices]
     if MANUAL_LABEL is not None:
-      MASK_SAMPLE = MANUAL_LABEL[random_indices]
+        MASK_SAMPLE = MANUAL_LABEL[random_indices]
 
 
 def umap_fit(
@@ -186,8 +187,11 @@ def pca_fit(points, dimension, use_coords):
     print("Done")
     return u
 
+
 def tsne_fit(points, perplexity, max_iter, dimension, use_coords):
-    fit = manifold.TSNE(n_components=dimension,perplexity=perplexity,max_iter=max_iter)
+    fit = TSNE(
+        n_components=dimension, perplexity=perplexity, max_iter=max_iter, n_jobs=-1
+    )
     if use_coords:
         dataset = points
     else:
@@ -195,6 +199,7 @@ def tsne_fit(points, perplexity, max_iter, dimension, use_coords):
     u = fit.fit_transform(dataset)
     print("Done")
     return u
+
 
 server = get_server(client_type="vue3")
 state = server.state
@@ -216,7 +221,9 @@ def fit_data(points):
     elif state.dimensionality_reduction_method == "pca":
         return pca_fit(points, state.dimension, state.use_coords)
     elif state.dimensionality_reduction_method == "tsne":
-        return tsne_fit(points, state.perplexity, state.max_iter, state.dimension, state.use_coords)
+        return tsne_fit(
+            points, state.perplexity, state.max_iter, state.dimension, state.use_coords
+        )
 
 
 @state.change("color_by")
@@ -480,7 +487,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                     v_model=("metric", DEFAULTS["metric"]),
                     label="metric",
                     items=(
-                        "metric",
+                        "umap_metric_function",
                         [
                             {"title": "euclidean", "value": "euclidean"},
                             {"title": "manhattan", "value": "manhattan"},
