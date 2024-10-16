@@ -348,7 +348,6 @@ def on_parallel_coords_select_event(selection_data):
     constrained_ranges = selection_data[key]
     print(f"{channel=}")
     print(f"{constrained_ranges=}")
-    #  keep track of all constrains since plotly only gices us the current selection
 
     # reset constrain for this channel
     if constrained_ranges is None:
@@ -360,17 +359,17 @@ def on_parallel_coords_select_event(selection_data):
         else:
             CURRENT_CONSTRAINS[channel] = constrained_ranges[0]
 
-    condition = True
-    print(CURRENT_CONSTRAINS)
-    for channel, channel_constrain in CURRENT_CONSTRAINS.items():
-        if channel_constrain:
-            for constrain in channel_constrain:
-                print(constrain)
-                condition &= (DATA[:, channel] > constrain[0]) & (
+    condition = np.ones(DATA.shape[0], dtype=bool)
+    for channel, channel_constrain_list in CURRENT_CONSTRAINS.items():
+        if channel_constrain_list:
+            channel_constrain = False
+            for constrain in channel_constrain_list:
+                channel_constrain |= (DATA[:, channel] > constrain[0]) & (
                     DATA[:, channel] < constrain[1]
                 )
+            condition &= channel_constrain
+
     IDS = DATA[condition, ORIGINAL_IDS_INDEX].astype(np.int32)
-    print(IDS)
     update_volume_view(IDS)
 
 
