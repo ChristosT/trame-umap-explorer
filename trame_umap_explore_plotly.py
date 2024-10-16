@@ -16,6 +16,7 @@ import numba
 import os.path
 import sklearn.cluster as cluster
 from sklearn import decomposition
+from sklearn import manifold
 from volume_view import VolumeView
 
 DEFAULTS = {
@@ -33,6 +34,8 @@ DEFAULTS = {
     "min_cluster_size": 5,
     "max_eps": 100,
     "metric": "euclidean",
+    "perplexity":30.0,
+    "max_iter":250,
 }
 RANDOM_STATE = 42
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
@@ -168,6 +171,15 @@ def pca_fit(points, dimension, use_coords):
     print("Done")
     return u
 
+def tsne_fit(points, perplexity, max_iter, dimension, use_coords):
+    fit = manifold.TSNE(n_components=dimension,perplexity=perplexity,max_iter=max_iter)
+    if use_coords:
+        dataset = points
+    else:
+        dataset = points[:, :NUMBER_OF_CHANNELS]
+    u = fit.fit_transform(dataset)
+    print("Done")
+    return u
 
 server = get_server(client_type="vue3")
 state = server.state
@@ -188,6 +200,8 @@ def fit_data(points):
         )
     elif state.dimensionality_reduction_method == "pca":
         return pca_fit(points, state.dimension, state.use_coords)
+    elif state.dimensionality_reduction_method == "tsne":
+        return tsne_fit(points, state.perplexity, state.max_iter, state.dimension, state.use_coords)
 
 
 @state.change("color_by")
@@ -391,6 +405,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                 [
                     {"title": "umap", "value": "umap"},
                     {"title": "pca", "value": "pca"},
+                    {"title": "t-sne", "value": "tsne"},
                 ],
             ),
         )
@@ -466,6 +481,29 @@ with SinglePageWithDrawerLayout(server) as layout:
                             {"title": "correlation", "value": "correlation"},
                         ],
                     ),
+                )
+        with vuetify3.VCard(
+            classes="mb-2 mx-1", v_show="dimensionality_reduction_method === 'tsne'"
+        ):
+            with vuetify3.VCardText():
+                vuetify3.VSlider(
+                    label="perplexity",
+                    v_model=("perplexity", DEFAULTS["perplexity"]),
+                    min=0,
+                    max=100,
+                    step=1,
+                    hide_details=True,
+                    thumb_label=True,
+                )
+                
+                vuetify3.VSlider(
+                    label="max_iter",
+                    v_model=("max_iter", DEFAULTS["max_iter"]),
+                    min=10,
+                    max=10000,
+                    step=1,
+                    hide_details=True,
+                    thumb_label=True,
                 )
         # common style options
         with vuetify3.VCard(classes="mb-2 mx-1"):
