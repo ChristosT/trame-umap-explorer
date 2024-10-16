@@ -41,6 +41,7 @@ RANDOM_STATE = 42
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
 LABELMAP_FILENAME = "miec_rough_label_map.npy"
 DATA = None
+MANUAL_LABEL = None
 
 
 def load_hdf5_dataset(path):
@@ -131,7 +132,8 @@ def sample_data(data, sample_size):
     global SAMPLE, MASK_SAMPLE
     random_indices = np.random.choice(data.shape[0], sample_size, replace=False)
     SAMPLE = data[random_indices]
-    MASK_SAMPLE = MANUAL_LABEL[random_indices]
+    if MANUAL_LABEL is not None:
+      MASK_SAMPLE = MANUAL_LABEL[random_indices]
 
 
 def umap_fit(
