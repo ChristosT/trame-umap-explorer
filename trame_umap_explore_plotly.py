@@ -501,6 +501,15 @@ with SinglePageWithDrawerLayout(server) as layout:
                             {"title": "seuclidean", "value": "seuclidean"},
                             {"title": "cosine", "value": "cosine"},
                             {"title": "correlation", "value": "correlation"},
+                            {"title": "hamming", "value": "hamming"},
+                            {"title": "jaccard", "value": "jaccard"},
+                            {"title": "dice", "value": "dice"},
+                            {"title": "russellrao", "value": "russellrao"},
+                            {"title": "kulsinski", "value": "kulsinski"},
+                            {"title": "rogerstanimoto", "value": "dice"},
+                            {"title": "sokalmichener", "value": "sokalmichener"},
+                            {"title": "sokalsneath", "value": "sokalsneath"},
+                            {"title": "yule", "value": "yule"},
                         ],
                     ),
                 )
@@ -517,7 +526,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                     hide_details=True,
                     thumb_label=True,
                 )
-                
+
                 vuetify3.VSlider(
                     label="max_iter",
                     v_model=("max_iter", DEFAULTS["max_iter"]),
