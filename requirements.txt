@@ -1,6 +1,9 @@
+h5py
+numba
+numpy
+scikit-learn
 trame
 trame-vuetify
 trame-plotly
 trame-components
-sklearn
 umap-learn
