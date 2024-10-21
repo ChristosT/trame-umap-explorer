@@ -4,6 +4,7 @@ Installation requirements:
 """
 
 import plotly.graph_objects as go
+import plotly.io as pio
 
 from trame.app import get_server
 from trame.ui.vuetify3 import SinglePageWithDrawerLayout
@@ -37,6 +38,7 @@ DEFAULTS = {
     "metric": "euclidean",
     "perplexity": 30.0,
     "max_iter": 250,
+    "cluster_opacity": 0.2,
 }
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
 LABELMAP_FILENAME = "miec_rough_label_map.npy"
@@ -44,9 +46,36 @@ RGBA_FILENAME = "rgba_dataset.npy"
 #  the entire dataset in (points,nchannels format)
 DATA = None
 MANUAL_LABEL = None
+DATA_MASK = None
+RGB_DATA_SHAPE = None
+CLUSTERS = None
 
 # keep track of user provided constains in parallel coordinates
 CURRENT_CONSTRAINS = dict()
+
+# set a default style so that the colormap is fixed and can be reused for 3d view"
+pio.templates.default = "plotly"
+import plotly.colors as pcolors
+
+COLORS = pcolors.qualitative.__dict__["Plotly"]
+
+
+def hex_to_float_rgb(hex_color):
+    # Remove the '#' if it's there
+    hex_color = hex_color.lstrip("#")
+    # Convert to RGB
+    return tuple(int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def hex_to_int_rgb(hex_color):
+    # Remove the '#' if it's there
+    hex_color = hex_color.lstrip("#")
+    # Convert to RGB
+    return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
+
+COLORS_RGB = [hex_to_float_rgb(x) for x in COLORS]
+COLORS_INT_RGB = [hex_to_int_rgb(x) for x in COLORS]
 
 
 def parse_arguments():
@@ -116,7 +145,7 @@ def _normalize_data(data: np.ndarray, new_min: float = 0, new_max: float = 1):
 
 
 def preprocess(filename, labelfile, drop_ones=False):
-    global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL, ORIGINAL_IDS_INDEX, CURRENT_CONSTRAINS
+    global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL, ORIGINAL_IDS_INDEX, CURRENT_CONSTRAINS, DATA_MASK
     LABELS, original_data = load_hdf5_dataset(filename)
     original_shape = original_data.shape
     print(f"Reading {filename}. shape {original_data.shape}")
@@ -158,6 +187,7 @@ def preprocess(filename, labelfile, drop_ones=False):
         mask = mask & nonone_indices
 
     DATA = data[mask]
+    DATA_MASK = mask
 
     if os.path.isfile(labelfile):
         MANUAL_LABEL = np.load(labelfile)
@@ -173,12 +203,16 @@ def preprocess(filename, labelfile, drop_ones=False):
 
 
 def preprocess_rba(filename):
+    global RGB_DATA_SHAPE
     original_data = np.load(filename)
     data_shape = original_data.shape[:-1]
     num_channels = original_data.shape[-1]
+    RGB_DATA_SHAPE = data_shape
+    print(original_data[50, 50, 50])
     # flatten
     flattened_data = original_data.reshape(np.prod(data_shape), num_channels)
     nonzero_indices = ~np.all(np.isclose(flattened_data, 0), axis=1)
+    print("VOLUME_DATA", original_data.shape)
 
     VOLUME_VIEW.set_data(original_data)
     mask_ref = VOLUME_VIEW.mask_reference
@@ -256,6 +290,7 @@ def tsne_fit(points, perplexity, max_iter, dimension, use_coords):
 server = get_server(client_type="vue3")
 state = server.state
 state.trame__title = "umap explorer"
+state.cluster_info = None
 
 
 def fit_data(points):
@@ -303,7 +338,11 @@ def on_clustering_method(**kwargs):
             color_by=state.color_by, clustering_method=state.clustering_method
         )
         server.controller.figure_scatter_update(scatter(U, COLOR_ARGS, state.dimension))
-        server.controller.figure_parallel_coords_update(parallel_coords())
+        server.controller.figure_parallel_coords_update(
+            parallel_coords(color_args=COLOR_ARGS)
+        )
+        if state.clustering_method == "manual":
+            update_volume_view(labels=MANUAL_LABEL)
 
 
 @state.change("marker_size")
@@ -311,15 +350,19 @@ def on_marker_size(marker_size, **kwargs):
     global COLOR_ARGS
     if U is not None:
         COLOR_ARGS["marker"]["size"] = marker_size
-
         server.controller.figure_scatter_update(scatter(U, COLOR_ARGS, state.dimension))
 
 
 def get_color_args(color_by=None, clustering_method=None):
+    global CLUSTERS
+    # TODO decouple color attributes with clustering
     size = state.marker_size
     if clustering_method is None:
         if color_by is None:
-            color_args = {"marker_color": "blue", "marker": {"size": size}}
+            color_args = {
+                "marker_color": "blue",
+                "marker": {"size": size, "opacity": 1.0},
+            }
         else:
             if color_by < 10:
                 color_args = {
@@ -335,25 +378,46 @@ def get_color_args(color_by=None, clustering_method=None):
                 }
     else:
         if clustering_method == "kmeans":
-            labels = cluster.KMeans(n_clusters=state.n_clusters).fit_predict(U)
-            color_args = {"marker_color": labels, "marker": {"size": size}}
+            clustering_map = cluster.KMeans(n_clusters=state.n_clusters).fit(U)
+            labels = clustering_map.predict(U)
+            color_args = {
+                "marker_color": labels,
+                "marker": {"size": size, "opacity": 1.0},
+            }
+            CLUSTERS = labels
         elif clustering_method == "hdbscan":
-            labels = cluster.HDBSCAN(
+            clustering_map = cluster.HDBSCAN(
                 min_cluster_size=state.min_cluster_size,
                 min_samples=state.min_samples,
-            ).fit_predict(U)
+            ).fit(U)
+            labels = clustering_map.predict(U)
             labels += 1  # labels in hdbscan start from -1
-            color_args = {"marker_color": labels, "marker": {"size": size}}
+            color_args = {
+                "marker_color": labels,
+                "marker": {"size": size, "opacity": 1.0},
+            }
+            CLUSTERS = labels
         elif clustering_method == "optics":
             labels = cluster.OPTICS(
                 min_samples=state.min_samples, max_eps=state.max_eps
             ).fit_predict(U)
-            color_args = {"marker_color": labels, "marker": {"size": size}}
+            color_args = {
+                "marker_color": labels,
+                "marker": {"size": size, "opacity": 1.0},
+            }
             labels += 1  # labels in optics start from -1
+            CLUSTERS = labels
         elif clustering_method == "manual":
             color_args = {"marker_color": list(MASK_SAMPLE), "marker": {"size": size}}
+            CLUSTERS = MASK_SAMPLE
         else:
             pass
+        uniq_labels = np.unique(CLUSTERS)
+        fields = dict()
+        for l in uniq_labels:
+            fields[str(l)] = {"opacity": DEFAULTS["cluster_opacity"]}
+        state.cluster_info = fields
+        state.dirty("cluster_info")
     return color_args
 
 
@@ -367,7 +431,9 @@ def on_scatter_selected_event(selection_data):
             np.min([item["metadata"][i] for item in selection_data]),
             np.max([item["metadata"][i] for item in selection_data]),
         ]
-    server.controller.figure_parallel_coords_update(parallel_coords(scatter_selection))
+    server.controller.figure_parallel_coords_update(
+        parallel_coords(scatter_selection, color_args=COLOR_ARGS)
+    )
     ids = [item["metadata"][-1] for item in selection_data]
     update_volume_view(mask_ids=ids)
 
@@ -435,7 +501,7 @@ def scatter(U, color_args=None, dimension=2):
     return go.Figure(data=plot).update_layout(margin=dict(l=10, r=10, t=25, b=10))
 
 
-def parallel_coords(constraintranges=None):
+def parallel_coords(constraintranges=None, color_args=None):
     dimensions = []
     print(constraintranges)
     for i in range(NUMBER_OF_CHANNELS):
@@ -452,18 +518,63 @@ def parallel_coords(constraintranges=None):
     return go.Figure(
         data=go.Parcoords(
             dimensions=dimensions,
-            line=dict(color=COLOR_ARGS["marker_color"]),
+            line=dict(
+                color=color_args["marker_color"],
+            ),
         )
     )
 
 
-def update_volume_view(mask_ids=None):
+def update_opacity():
+    print(state.cluster_info)
+    if state.cluster_info is not None:
+        update_volume_view(labels=MANUAL_LABEL)
+        # scatter plot
+        opacities = [state.cluster_info[str(l)]["opacity"] for l in CLUSTERS]
+        COLOR_ARGS["marker_color"] = [
+            f"rgba{*COLORS_INT_RGB[label], opacities[i]}"
+            for i, label in enumerate(CLUSTERS)
+        ]
+        server.controller.figure_scatter_update(scatter(U, COLOR_ARGS, state.dimension))
+        # parallel coords do not support opacity at the moment
+        # see https://github.com/plotly/plotly.js/issues/3964#issuecomment-502110263
+        # server.controller.figure_parallel_coords_update(parallel_coords(color_args=COLOR_ARGS))
+
+
+def update_volume_view(mask_ids=None, labels=None):
     if mask_ids is not None:
         mask_ref = VOLUME_VIEW.mask_reference
         mask_ref[:] = False
         mask_ref[mask_ids] = True
         VOLUME_VIEW.mask_data.Modified()
         server.controller.view_update()
+    elif labels is not None:
+        print("apply manual")
+        print(state.cluster_info)
+        mask_ref = VOLUME_VIEW.mask_reference
+        new_data = np.zeros((*mask_ref.shape, 4), dtype=np.float64)
+
+        # we have a full data mask
+        if np.prod(mask_ref[DATA_MASK].shape) == labels.shape[0]:
+            rgba = [
+                (*COLORS_RGB[label], state.cluster_info[str(label)]["opacity"])
+                for label in labels
+            ]
+            print(labels.shape)
+            print(rgba[0])
+            print(new_data[DATA_MASK].shape)
+            new_data[DATA_MASK] = np.array(rgba)  # .flatten()
+            new_data = new_data.reshape((*RGB_DATA_SHAPE, 4))
+            print(new_data.shape)
+            VOLUME_VIEW.set_data(new_data)
+            mask_ref = VOLUME_VIEW.mask_reference
+            mask_ref[DATA_MASK] = 1
+            VOLUME_VIEW.mask_data.Modified()
+            server.controller.view_update()
+            print("updated")
+        # we need to predict the full mask
+        else:
+            pass
 
 
 # -----------------------------------------------------------------------------
@@ -475,7 +586,9 @@ def update_plot():
     COLOR_ARGS = get_color_args(
         color_by=state.color_by, clustering_method=state.clustering_method
     )
-    server.controller.figure_parallel_coords_update(parallel_coords())
+    server.controller.figure_parallel_coords_update(
+        parallel_coords(color_args=COLOR_ARGS)
+    )
     server.controller.figure_scatter_update(
         scatter(
             U,
@@ -762,6 +875,27 @@ with SinglePageWithDrawerLayout(server) as layout:
                         hide_details=True,
                         thumb_label=True,
                     )
+
+                with vuetify3.VCard(
+                    v_if="cluster_info",
+                    classes="mb-2 mx-1",
+                ):
+                    vuetify3.VBtn("update opacity", click=update_opacity)
+                    with vuetify3.VRow(
+                        v_for=("data, name in cluster_info"),
+                        key="name",
+                        classes="mx-0 my-1",
+                    ):
+                        vuetify3.VLabel("Cluster opacity", classes="text-body-2 ml-1")
+                        vuetify3.VSlider(
+                            model_value=("data.opacity",),
+                            min=0,
+                            max=1,
+                            step=0.05,
+                            hide_details=True,
+                            thumb_label=True,
+                            update_modelValue="cluster_info[name].opacity = $event; flushState('cluster_info')",
+                        )
 
                 with vuetify3.VCard(classes="mb-2 mx-1"):
                     with vuetify3.VCardText():
