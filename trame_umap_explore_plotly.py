@@ -18,6 +18,7 @@ import sklearn.cluster as cluster
 from sklearn import decomposition
 from sklearn.manifold import TSNE
 from volume_view import VolumeView
+import argparse
 
 DEFAULTS = {
     "dimensionality_reduction_method": "umap",
@@ -39,12 +40,31 @@ DEFAULTS = {
 }
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
 LABELMAP_FILENAME = "miec_rough_label_map.npy"
+RGBA_FILENAME = "rgba_dataset.npy"
 #  the entire dataset in (points,nchannels format)
 DATA = None
 MANUAL_LABEL = None
 
 # keep track of user provided constains in parallel coordinates
 CURRENT_CONSTRAINS = dict()
+
+
+def parse_arguments():
+    global FILENAME, LABELMAP_FILENAME, RGBA_FILENAME
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--label", help="labelmap used for clustering", default=LABELMAP_FILENAME
+    )
+    parser.add_argument("--file", help="file to read", default=FILENAME)
+    parser.add_argument("--rgba", help="rgba volume for 3D view", default=RGBA_FILENAME)
+
+    args = parser.parse_args()
+    if args.label:
+        LABELMAP_FILENAME = args.label
+    if args.file:
+        FILENAME = args.file
+    if args.rgba:
+        RBGA_FILENAME = args.rgba
 
 
 def load_hdf5_dataset(path):
@@ -61,7 +81,7 @@ def load_hdf5_dataset(path):
 
 
 @numba.njit(cache=True, nogil=True)
-def _remove_padding_uniform(data: np.ndarray) -> np.ndarray:
+def _calculate_padding_uniform(data: np.ndarray) -> np.ndarray:
     num_channels = data.shape[-1]
     zero_data = np.isclose(data, 0).sum(axis=3) == num_channels
 
@@ -76,9 +96,12 @@ def _remove_padding_uniform(data: np.ndarray) -> np.ndarray:
         n += 1
         indices = np.array([n, -n - 1])
 
+    return n
+
+
+def _remove_padding_uniform(data: np.ndarray, n) -> np.ndarray:
     if n != 0:
         data = data[n : -n - 1, n : -n - 1, n : -n - 1]
-
     return data
 
 
@@ -95,7 +118,10 @@ def _normalize_data(data: np.ndarray, new_min: float = 0, new_max: float = 1):
 def preprocess(filename, labelfile, drop_ones=False):
     global LABELS, DATA, NUMBER_OF_CHANNELS, MANUAL_LABEL, ORIGINAL_IDS_INDEX, CURRENT_CONSTRAINS
     LABELS, original_data = load_hdf5_dataset(filename)
-    original_data = _remove_padding_uniform(original_data)
+    original_shape = original_data.shape
+    print(f"Reading {filename}. shape {original_data.shape}")
+    n_to_crop = _calculate_padding_uniform(original_data)
+    original_data = _remove_padding_uniform(original_data, n_to_crop)
     data_shape = original_data.shape[:-1]
     num_channels = original_data.shape[-1]
     NUMBER_OF_CHANNELS = num_channels
@@ -135,6 +161,10 @@ def preprocess(filename, labelfile, drop_ones=False):
 
     if os.path.isfile(labelfile):
         MANUAL_LABEL = np.load(labelfile)
+        print(f"Reading {labelfile}. Shape: {MANUAL_LABEL.shape}")
+        if MANUAL_LABEL.shape == original_shape[:-1]:
+            if n_to_crop != 0:
+                MANUAL_LABEL = _remove_padding_uniform(MANUAL_LABEL, n_to_crop)
         MANUAL_LABEL = MANUAL_LABEL.reshape(np.prod(MANUAL_LABEL.shape))
         MANUAL_LABEL = MANUAL_LABEL[mask]
 
@@ -779,9 +809,9 @@ with SinglePageWithDrawerLayout(server) as layout:
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    parse_arguments()
     preprocess(filename=FILENAME, labelfile=LABELMAP_FILENAME, drop_ones=False)
-    FILENAME = "./rgba_dataset.npy"
-    preprocess_rba(filename=FILENAME)
+    preprocess_rba(filename=RGBA_FILENAME)
     server.controller.view_update()
     sample_data(DATA, DEFAULTS["sample_size"])
     server.start()
