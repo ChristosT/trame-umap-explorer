@@ -58,13 +58,13 @@ def parse_arguments():
     parser.add_argument("--file", help="file to read", default=FILENAME)
     parser.add_argument("--rgba", help="rgba volume for 3D view", default=RGBA_FILENAME)
 
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()  # allow for --server arg
     if args.label:
         LABELMAP_FILENAME = args.label
     if args.file:
         FILENAME = args.file
     if args.rgba:
-        RBGA_FILENAME = args.rgba
+        RGBA_FILENAME = args.rgba
 
 
 def load_hdf5_dataset(path):
