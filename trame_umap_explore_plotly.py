@@ -342,12 +342,14 @@ def get_color_args(color_by=None, clustering_method=None):
                 min_cluster_size=state.min_cluster_size,
                 min_samples=state.min_samples,
             ).fit_predict(U)
+            labels += 1  # labels in hdbscan start from -1
             color_args = {"marker_color": labels, "marker": {"size": size}}
         elif clustering_method == "optics":
             labels = cluster.OPTICS(
                 min_samples=state.min_samples, max_eps=state.max_eps
             ).fit_predict(U)
             color_args = {"marker_color": labels, "marker": {"size": size}}
+            labels += 1  # labels in optics start from -1
         elif clustering_method == "manual":
             color_args = {"marker_color": list(MASK_SAMPLE), "marker": {"size": size}}
         else:
