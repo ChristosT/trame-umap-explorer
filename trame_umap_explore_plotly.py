@@ -446,14 +446,50 @@ def on_scatter_selected_event(selection_data):
     scatter_selection = dict()
     for i in range(NUMBER_OF_CHANNELS):
         scatter_selection[i] = [
-            np.min([item["metadata"][i] for item in selection_data]),
-            np.max([item["metadata"][i] for item in selection_data]),
+            [
+                np.min([item["metadata"][i] for item in selection_data]),
+                np.max([item["metadata"][i] for item in selection_data]),
+            ]
         ]
     server.controller.figure_parallel_coords_update(
         parallel_coords(scatter_selection, color_args=COLOR_ARGS)
     )
-    ids = [item["metadata"][-1] for item in selection_data]
-    update_volume_view(mask_ids=ids)
+
+    # using the selected IDS results in a too sparse volume view
+    # ids = [item["metadata"][-1] for item in selection_data]
+    # update_volume_view(mask_ids=ids)
+
+    # volume view we would like to use inference on the dimensionality
+    # reduction method and evaluate mapped X,Y for each voxel but this takes
+    # too much time.
+
+    # As a remedy we use the range derived above
+    ids = filter_on_constrains(scatter_selection)
+    update_volume_view(ids)
+
+    # we can also perfom inferece and perform on those values only.
+
+
+def filter_on_constrains(constrains):
+    """Filter DATA given a list of channel constrains in the form of a list of non
+    overlapping lists.  e.g {0: [[1,3]], 2:[[ 0,1], [2,3]]} returns the (flat)
+    ids inside DATA where channel 0 value is between 1,3 AND channel 2 value is
+    in [0,1] OR [2,3]
+    """
+    condition = np.ones(DATA.shape[0], dtype=bool)
+    for channel, channel_constrain_list in constrains.items():
+        if channel_constrain_list:
+            channel_constrain = False
+            for constrain in channel_constrain_list:
+                print(channel)
+                print(constrain)
+                channel_constrain |= (DATA[:, channel] > constrain[0]) & (
+                    DATA[:, channel] < constrain[1]
+                )
+            condition &= channel_constrain
+
+    ids = DATA[condition, ORIGINAL_IDS_INDEX].astype(np.int32)
+    return ids
 
 
 def on_parallel_coords_select_event(selection_data):
@@ -475,18 +511,8 @@ def on_parallel_coords_select_event(selection_data):
         else:
             CURRENT_CONSTRAINS[channel] = constrained_ranges[0]
 
-    condition = np.ones(DATA.shape[0], dtype=bool)
-    for channel, channel_constrain_list in CURRENT_CONSTRAINS.items():
-        if channel_constrain_list:
-            channel_constrain = False
-            for constrain in channel_constrain_list:
-                channel_constrain |= (DATA[:, channel] > constrain[0]) & (
-                    DATA[:, channel] < constrain[1]
-                )
-            condition &= channel_constrain
-
-    IDS = DATA[condition, ORIGINAL_IDS_INDEX].astype(np.int32)
-    update_volume_view(IDS)
+    ids = filter_on_constrains(CURRENT_CONSTRAINS)
+    update_volume_view(ids)
 
 
 def scatter(U, color_args=None, dimension=2):
@@ -895,7 +921,7 @@ with SinglePageWithDrawerLayout(server) as layout:
                     )
 
                 with vuetify3.VCard(
-                    v_if="cluster_info",
+                    v_if="cluster_info && clustering_method != None",
                     classes="mb-2 mx-1",
                 ):
                     vuetify3.VBtn("update opacity", click=update_opacity)
