@@ -41,14 +41,15 @@ DEFAULTS = {
     "cluster_opacity": 0.2,
 }
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
-LABELMAP_FILENAME = "miec_rough_label_map.npy"
-RGBA_FILENAME = "rgba_dataset.npy"
+LABELMAP_FILENAME = None  # "miec_rough_label_map.npy"
+RGBA_FILENAME = None  # "rgba_dataset.npy"
 #  the entire dataset in (points,nchannels format)
 DATA = None
 MANUAL_LABEL = None
 DATA_MASK = None
 RGB_DATA_SHAPE = None
 CLUSTERS = None
+NORMALIZE_SEPARATELY = False
 
 # keep track of user provided constains in parallel coordinates
 CURRENT_CONSTRAINS = dict()
@@ -79,13 +80,18 @@ COLORS_INT_RGB = [hex_to_int_rgb(x) for x in COLORS]
 
 
 def parse_arguments():
-    global FILENAME, LABELMAP_FILENAME, RGBA_FILENAME
+    global FILENAME, LABELMAP_FILENAME, RGBA_FILENAME, NORMALIZE_SEPARATELY
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--label", help="labelmap used for clustering", default=LABELMAP_FILENAME
     )
     parser.add_argument("--file", help="file to read", default=FILENAME)
     parser.add_argument("--rgba", help="rgba volume for 3D view", default=RGBA_FILENAME)
+    parser.add_argument(
+        "--normalize-separately",
+        help="normalize each channel separately",
+        default=NORMALIZE_SEPARATELY,
+    )
 
     args, _ = parser.parse_known_args()  # allow for --server arg
     if args.label:
@@ -94,6 +100,10 @@ def parse_arguments():
         FILENAME = args.file
     if args.rgba:
         RGBA_FILENAME = args.rgba
+
+    if args.normalize_separately:
+        print("NORMALIZE_SEPARATELY")
+        NORMALIZE_SEPARATELY = args.normalize_separately
 
 
 def load_hdf5_dataset(path):
@@ -154,12 +164,18 @@ def preprocess(filename, labelfile, drop_ones=False):
     data_shape = original_data.shape[:-1]
     num_channels = original_data.shape[-1]
     NUMBER_OF_CHANNELS = num_channels
+    if NORMALIZE_SEPARATELY:
+        # Normalize each channel to be between 0 and 1
+        for i in range(original_data.shape[-1]):
+            original_data[:, :, :, i] = _normalize_data(original_data[:, :, :, i])
+    else:
+        original_data = _normalize_data(original_data)
+
     # flatten
     raw_unpadded_flattened_data = original_data.reshape(
         np.prod(data_shape), num_channels
     )
     data = raw_unpadded_flattened_data.copy()
-    data = _normalize_data(data)
 
     # add ijk indices
     I = np.indices(data_shape).reshape(3, -1).T
@@ -189,7 +205,7 @@ def preprocess(filename, labelfile, drop_ones=False):
     DATA = data[mask]
     DATA_MASK = mask
 
-    if os.path.isfile(labelfile):
+    if labelfile is not None and os.path.isfile(labelfile):
         MANUAL_LABEL = np.load(labelfile)
         print(f"Reading {labelfile}. Shape: {MANUAL_LABEL.shape}")
         if MANUAL_LABEL.shape == original_shape[:-1]:
@@ -203,6 +219,8 @@ def preprocess(filename, labelfile, drop_ones=False):
 
 
 def preprocess_rba(filename):
+    if filename is None:
+        return
     global RGB_DATA_SHAPE
     original_data = np.load(filename)
     data_shape = original_data.shape[:-1]
@@ -528,7 +546,7 @@ def parallel_coords(constraintranges=None, color_args=None):
 def update_opacity():
     print(state.cluster_info)
     if state.cluster_info is not None:
-        update_volume_view(labels=MANUAL_LABEL)
+        update_volume_view(labels=CLUSTERS)
         # scatter plot
         opacities = [state.cluster_info[str(l)]["opacity"] for l in CLUSTERS]
         COLOR_ARGS["marker_color"] = [
