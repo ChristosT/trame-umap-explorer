@@ -1,9 +1,13 @@
 h5py
 numba
 numpy
+matplotlib
+plotly
 scikit-learn
 trame
-trame-vuetify
-trame-plotly
 trame-components
+trame-plotly
+trame-vtk
+trame-vuetify
+vtk
 umap-learn
