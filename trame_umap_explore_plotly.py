@@ -18,8 +18,12 @@ import os.path
 import sklearn.cluster as cluster
 from sklearn import decomposition
 from sklearn.manifold import TSNE
+
+# from openTSNE import TSNE
 from volume_view import VolumeView
 import argparse
+from timeit import default_timer as timer
+
 
 DEFAULTS = {
     "dimensionality_reduction_method": "umap",
@@ -31,13 +35,13 @@ DEFAULTS = {
     "color_by": None,
     "clustering_method": None,
     "n_clusters": 1,
-    "marker_size": 1,
+    "marker_size": 6,
     "min_samples": 2,
     "min_cluster_size": 5,
     "max_eps": 100,
     "metric": "euclidean",
     "perplexity": 30.0,
-    "max_iter": 250,
+    "max_iter": 3000,
     "cluster_opacity": 0.2,
 }
 FILENAME = "CeCoFeGd_doi_10.1038_s43246-022-00259-x.h5"
@@ -180,9 +184,9 @@ def preprocess(filename, labelfile, drop_ones=False):
     # add ijk indices
     I = np.indices(data_shape).reshape(3, -1).T
     data = np.concatenate((data, I), axis=1)
-    data[:, 4] /= data_shape[0]
-    data[:, 5] /= data_shape[1]
-    data[:, 6] /= data_shape[2]
+    data[:, NUMBER_OF_CHANNELS] /= data_shape[0]
+    data[:, NUMBER_OF_CHANNELS + 1] /= data_shape[1]
+    data[:, NUMBER_OF_CHANNELS + 2] /= data_shape[2]
 
     # add flat index
     I = np.indices([data.shape[0]]).T
@@ -243,6 +247,7 @@ SCATTER_SELECTION = dict()
 VOLUME_VIEW = VolumeView()
 SAMPLE = None
 MASK_SAMPLE = None
+EMBEDDING_MAP = None
 
 
 def sample_data(data, sample_size):
@@ -264,7 +269,8 @@ def umap_fit(
     metric,
     use_coords,
 ):
-    fit = umap.UMAP(
+    global EMBEDDING_MAP
+    f = umap.UMAP(
         min_dist=min_dist,
         repulsion_strength=repulsion_strength,
         spread=spread,
@@ -273,34 +279,42 @@ def umap_fit(
         metric=metric,
     )
     if use_coords:
-        dataset = points
+        dataset = points[:, : NUMBER_OF_CHANNELS + 3]
     else:
         dataset = points[:, :NUMBER_OF_CHANNELS]
-    u = fit.fit_transform(dataset)
+    fit = f.fit(dataset)
+    EMBEDDING_MAP = fit
+    u = fit.transform(dataset)
     print("Done")
     return u
 
 
 def pca_fit(points, dimension, use_coords):
-    fit = decomposition.PCA(n_components=dimension)
+    global EMBEDDING_MAP
+    f = decomposition.PCA(n_components=dimension)
     if use_coords:
-        dataset = points
+        dataset = points[:, : NUMBER_OF_CHANNELS + 3]
     else:
         dataset = points[:, :NUMBER_OF_CHANNELS]
-    u = fit.fit_transform(dataset)
+    fit = f.fit(dataset)
+    EMBEDDING_MAP = fit
+    u = fit.transform(dataset)
     print("Done")
     return u
 
 
 def tsne_fit(points, perplexity, max_iter, dimension, use_coords):
-    fit = TSNE(
-        n_components=dimension, perplexity=perplexity, max_iter=max_iter, n_jobs=-1
-    )
+    global EMBEDDING_MAP
+    f = TSNE(n_components=dimension, perplexity=perplexity, max_iter=max_iter, n_jobs=-1)
     if use_coords:
-        dataset = points
+        dataset = points[:, : NUMBER_OF_CHANNELS + 3]
     else:
         dataset = points[:, :NUMBER_OF_CHANNELS]
-    u = fit.fit_transform(dataset)
+    u = f.fit_transform(dataset)
+    # TODO this requires TSNE from a openTSNE package which is slower with default parameters
+    # u  = f.fit(dataset)
+    # EMBEDDING_MAP = fit
+    # u = fit.transform(dataset)
     print("Done")
     return u
 
@@ -439,8 +453,23 @@ def get_color_args(color_by=None, clustering_method=None):
     return color_args
 
 
-def on_scatter_selected_event(selection_data):
-    # example event [{'x': -0.1320136977614036, 'y': 0.772234734606532, 'id': 123, 'metadata': [0.12115617198637327, 0, 0, 0.8788438280136267]}
+import matplotlib
+
+
+def mask_points_with_polygon(points, x, y):
+    polygon_points = list(zip(x, y))
+    polygon = matplotlib.path.Path(polygon_points)
+    is_inside = polygon.contains_points(points)
+    return is_inside
+
+
+def on_scatter_selected_event(packet):
+    # print(packet)
+    selection_data = packet["selected"]
+    lasso_points = packet["lassoPoints"]
+    box_range = packet["range"]
+    if len(selection_data) == 0:
+        return
 
     # update the parallel coordinates simple with the min/max for each channel
     scatter_selection = dict()
@@ -459,7 +488,7 @@ def on_scatter_selected_event(selection_data):
     # ids = [item["metadata"][-1] for item in selection_data]
     # update_volume_view(mask_ids=ids)
 
-    # volume view we would like to use inference on the dimensionality
+    # in volume view we would like to use inference on the dimensionality
     # reduction method and evaluate mapped X,Y for each voxel but this takes
     # too much time.
 
@@ -467,7 +496,28 @@ def on_scatter_selected_event(selection_data):
     ids = filter_on_constrains(scatter_selection)
     update_volume_view(ids)
 
+    ## this is too slow
+
+    # start = timer()
+    # print("inference start")
     # we can also perfom inferece and perform on those values only.
+    # new_points = EMBEDDING_MAP.transform(DATA[ids,:NUMBER_OF_CHANNELS])
+    # end = timer()
+    # print("inference done",end-start)
+    # if lasso_points:
+    #  x = lasso_points['x']
+    #  y = lasso_points['y']
+    # else:
+    #  x = box_range['x']
+    #  y = box_range['y']
+    # print("filter points")
+    # start = timer()
+    # local_mask = mask_points_with_polygon(new_points,x,y)
+    # gids =  new_points[local_mask,ORIGINAL_IDS_INDEX].astype(np.int32)
+    # end = timer()
+    # print("filter points done",end-start)
+    # print(gids)
+    # update_volume_view(gids)
 
 
 def filter_on_constrains(constrains):
@@ -481,8 +531,6 @@ def filter_on_constrains(constrains):
         if channel_constrain_list:
             channel_constrain = False
             for constrain in channel_constrain_list:
-                print(channel)
-                print(constrain)
                 channel_constrain |= (DATA[:, channel] > constrain[0]) & (
                     DATA[:, channel] < constrain[1]
                 )
@@ -498,8 +546,8 @@ def on_parallel_coords_select_event(selection_data):
     key = list(selection_data.keys())[0]
     channel = int(re.search(r"\d+", key).group())
     constrained_ranges = selection_data[key]
-    print(f"{channel=}")
-    print(f"{constrained_ranges=}")
+    # print(f"{channel=}")
+    # print(f"{constrained_ranges=}")
 
     # reset constrain for this channel
     if constrained_ranges is None:
@@ -547,7 +595,7 @@ def scatter(U, color_args=None, dimension=2):
 
 def parallel_coords(constraintranges=None, color_args=None):
     dimensions = []
-    print(constraintranges)
+    # print(constraintranges)
     for i in range(NUMBER_OF_CHANNELS):
         dim = dict(
             range=[0, 1],
@@ -570,7 +618,7 @@ def parallel_coords(constraintranges=None, color_args=None):
 
 
 def update_opacity():
-    print(state.cluster_info)
+    # print(state.cluster_info)
     if state.cluster_info is not None:
         update_volume_view(labels=CLUSTERS)
         # scatter plot
@@ -659,7 +707,6 @@ with SinglePageWithDrawerLayout(server) as layout:
             hide_details=True,
             raw_attrs=[':min="100"', ':step="100"'],
         )
-        print(tb)
 
     with layout.drawer:
         vuetify3.VSelect(
@@ -959,9 +1006,13 @@ with SinglePageWithDrawerLayout(server) as layout:
                         display_mode_bar="true",
                         selected=
                         # "console.log($event)",
+                        # (
+                        #    on_scatter_selected_event,
+                        #    "[$event.points.map((v)=>({x:v.x, y:v.y, id: v.pointIndex, metadata:v.customdata} ))]",
+                        # ),
                         (
                             on_scatter_selected_event,
-                            "[$event.points.map((v)=>({x:v.x, y:v.y, id: v.pointIndex, metadata:v.customdata} ))]",
+                            "[{selected: $event.points.map((v)=>({x:v.x, y:v.y, id: v.pointIndex, metadata:v.customdata} )) , lassoPoints: $event.lassoPoints, range: $event.range }]",
                         ),
                     )
                     server.controller.figure_scatter_update = figure_scatter.update
