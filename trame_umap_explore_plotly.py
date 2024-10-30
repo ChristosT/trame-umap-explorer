@@ -427,8 +427,8 @@ def get_color_args(color_by=None, clustering_method=None):
             clustering_map = cluster.HDBSCAN(
                 min_cluster_size=state.min_cluster_size,
                 min_samples=state.min_samples,
-            ).fit(U)
-            labels = clustering_map.predict(U)
+            )
+            labels = clustering_map.fit_predict(U)
             labels += 1  # labels in hdbscan start from -1
             color_args = {
                 "marker_color": labels,
