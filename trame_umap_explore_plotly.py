@@ -175,6 +175,10 @@ def preprocess(filename, labelfile, drop_ones=False):
     else:
         original_data = _normalize_data(original_data)
 
+    for i in range(original_data.shape[-1]):
+        to_remove = original_data[:, :, :, i] > 0.9
+        original_data[to_remove] = 0
+
     # flatten
     raw_unpadded_flattened_data = original_data.reshape(
         np.prod(data_shape), num_channels
