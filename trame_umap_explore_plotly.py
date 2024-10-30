@@ -200,9 +200,6 @@ def preprocess(filename, labelfile, drop_ones=False):
     # get a view without the indices
     data_view = data[:, :num_channels]
     nonzero_indices = ~np.all(np.isclose(data_view, 0), axis=1)
-    data_view = data[nonzero_indices, :num_channels]
-    sums = np.sum(data_view, axis=1)
-    data[nonzero_indices, :num_channels] = data_view / sums[:, None]
 
     # drop ones
     mask = nonzero_indices
