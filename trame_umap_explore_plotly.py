@@ -62,6 +62,7 @@ CURRENT_CONSTRAINS = dict()
 pio.templates.default = "plotly"
 import plotly.colors as pcolors
 
+COLORSCALE = "jet"
 COLORS = pcolors.qualitative.__dict__["Plotly"]
 
 
@@ -417,7 +418,9 @@ def get_color_args(color_by=None, clustering_method=None):
             labels = clustering_map.predict(U)
             color_args = {
                 "marker_color": labels,
-                "marker": {"size": size, "opacity": 1.0},
+                "marker": {"size": size, "opacity": 1.0,
+                "colorscale": COLORSCALE,
+                },
             }
             CLUSTERS = labels
         elif clustering_method == "hdbscan":
@@ -429,7 +432,9 @@ def get_color_args(color_by=None, clustering_method=None):
             labels += 1  # labels in hdbscan start from -1
             color_args = {
                 "marker_color": labels,
-                "marker": {"size": size, "opacity": 1.0},
+                "marker": {"size": size, "opacity": 1.0,
+                "colorscale": COLORSCALE,
+                },
             }
             CLUSTERS = labels
         elif clustering_method == "optics":
@@ -438,12 +443,16 @@ def get_color_args(color_by=None, clustering_method=None):
             ).fit_predict(U)
             color_args = {
                 "marker_color": labels,
-                "marker": {"size": size, "opacity": 1.0},
+                "marker": {"size": size, "opacity": 1.0,
+                "colorscale": COLORSCALE,
+                },
             }
             labels += 1  # labels in optics start from -1
             CLUSTERS = labels
         elif clustering_method == "manual":
-            color_args = {"marker_color": list(MASK_SAMPLE), "marker": {"size": size}}
+            color_args = {"marker_color": list(MASK_SAMPLE), "marker": {"size": size,
+                "colorscale": COLORSCALE,
+            }}
             CLUSTERS = MASK_SAMPLE
         else:
             pass
@@ -615,6 +624,7 @@ def parallel_coords(constraintranges=None, color_args=None):
             dimensions=dimensions,
             line=dict(
                 color=color_args["marker_color"],
+                colorscale= COLORSCALE,
             ),
         )
     )
