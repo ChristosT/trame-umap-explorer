@@ -241,6 +241,8 @@ def preprocess_rba(filename):
     mask_ref = VOLUME_VIEW.mask_reference
     mask_ref[nonzero_indices] = 1
     VOLUME_VIEW.mask_data.Modified()
+    VOLUME_VIEW.volume_property.SetShade(1)
+
 
 
 U = None
