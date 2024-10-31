@@ -62,7 +62,7 @@ CURRENT_CONSTRAINS = dict()
 pio.templates.default = "plotly"
 import plotly.colors as pcolors
 
-COLORSCALE = "jet"
+COLORSCALE = "plasma"
 COLORS = pcolors.qualitative.__dict__["Plotly"]
 
 
