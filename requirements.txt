@@ -2,7 +2,7 @@ h5py
 numba
 numpy
 matplotlib
-plotly
+plotly==5.24.1
 scikit-learn
 trame
 trame-components
